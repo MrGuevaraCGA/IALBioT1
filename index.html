@@ -142,8 +142,8 @@
     </style>
     <script>
         // --- CONFIGURATION ---
-        // REPLACE WITH YOUR VERCEL URL AFTER DEPLOYMENT
-        const API_BASE = "https://REPLACE_WITH_YOUR_VERCEL_URL.vercel.app"; 
+        // ✅ UPDATED: point to your live Vercel backend
+        const API_BASE = "https://ial-bio-t1.vercel.app"; 
         
         let currentContext = "General Biology";
     </script>
@@ -591,7 +591,7 @@
                 const res = await fetch(`${API_BASE}/api/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, context: "Cardiology" })
+                    body: JSON.stringify({ prompt: prompt, systemInstruction: "You are a cardiology tutor explaining cardiovascular disease to a 14-year-old student." })
                 });
                 const data = await res.json();
                 reportText.innerHTML = marked.parse(data.reply);
@@ -618,7 +618,7 @@
                 const res = await fetch(`${API_BASE}/api/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, context: "Nutrition" })
+                    body: JSON.stringify({ prompt: prompt, systemInstruction: "You are a friendly nutrition tutor explaining swaps for better heart health." })
                 });
                 const data = await res.json();
                 resultDiv.innerHTML = marked.parse(data.reply);
@@ -680,7 +680,7 @@
                 const res = await fetch(`${API_BASE}/api/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, context: "Biology Exam", mode: "json" })
+                    body: JSON.stringify({ prompt: prompt, systemInstruction: "You generate short A-Level Biology MCQs and must output ONLY valid JSON." })
                 });
                 const data = await res.json();
                 
@@ -775,7 +775,10 @@
                 const res = await fetch(`${API_BASE}/api/ask`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: msg, context: currentContext })
+                    body: JSON.stringify({
+                        prompt: msg,
+                        systemInstruction: "You are a fun, AI version of a Biology teacher. You are a bot. Explain science for 12–16 year olds, concisely, emojis sparingly."
+                    })
                 });
                 
                 const data = await res.json();

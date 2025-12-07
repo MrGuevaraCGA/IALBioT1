@@ -44,7 +44,7 @@
         .flip-card {
             background-color: transparent;
             perspective: 1000px;
-            height: 320px; /* Increased slightly for new button */
+            height: 300px;
         }
         .flip-card-inner {
             position: relative;
@@ -82,22 +82,7 @@
             transform: rotateY(180deg);
         }
 
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-        }
-
-        /* Floating Chat */
+        /* Chat Widget */
         .chat-widget {
             position: fixed;
             bottom: 2rem;
@@ -157,6 +142,7 @@
     </style>
     <script>
         // --- CONFIGURATION ---
+        // REPLACE WITH YOUR VERCEL URL AFTER DEPLOYMENT
         const API_BASE = "https://REPLACE_WITH_YOUR_VERCEL_URL.vercel.app"; 
         
         let currentContext = "General Biology";
@@ -228,11 +214,8 @@
                             </div>
                             <div class="flip-card-back">
                                 <h4 class="text-xl font-bold mb-2">Dipole Nature</h4>
-                                <p class="text-sm content-text">Water is polar (dipole). Slightly positive H atoms attract negative ions, and slightly negative O atoms attract positive ions.</p>
-                                <div class="flex gap-2 mt-4">
-                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
-                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
-                                </div>
+                                <p class="text-sm">Water is polar (dipole). Slightly positive H atoms attract negative ions, and slightly negative O atoms attract positive ions.</p>
+                                <button onclick="readAloud(this)" class="mt-4 bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
                             </div>
                         </div>
                     </div>
@@ -248,11 +231,8 @@
                             </div>
                             <div class="flip-card-back">
                                 <h4 class="text-xl font-bold mb-2">Specific Heat Capacity</h4>
-                                <p class="text-sm content-text">High SHC due to hydrogen bonds. It takes a lot of energy to raise water's temperature, creating stable habitats.</p>
-                                <div class="flex gap-2 mt-4">
-                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
-                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
-                                </div>
+                                <p class="text-sm">High SHC due to hydrogen bonds. It takes a lot of energy to raise water's temperature, creating stable habitats.</p>
+                                <button onclick="readAloud(this)" class="mt-4 bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
                             </div>
                         </div>
                     </div>
@@ -268,11 +248,8 @@
                             </div>
                             <div class="flip-card-back">
                                 <h4 class="text-xl font-bold mb-2">Sticky Water</h4>
-                                <p class="text-sm content-text">Cohesion (water sticks to water) and Adhesion (water sticks to xylem) allow transport up tall trees.</p>
-                                <div class="flex gap-2 mt-4">
-                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
-                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
-                                </div>
+                                <p class="text-sm">Cohesion (water sticks to water) and Adhesion (water sticks to xylem) allow transport up tall trees.</p>
+                                <button onclick="readAloud(this)" class="mt-4 bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
                             </div>
                         </div>
                     </div>
@@ -647,37 +624,6 @@
                 resultDiv.innerHTML = marked.parse(data.reply);
             } catch (err) {
                 resultDiv.innerText = "AI is offline.";
-            }
-        }
-
-        // --- Explain Simple Logic (New) ---
-        async function explainSimple(btn) {
-            // Find the sibling text (the detailed description)
-            const cardBack = btn.closest('.flip-card-back');
-            const originalText = cardBack.querySelector('.content-text').innerText;
-            
-            // Temporary loading state
-            const originalBtnText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-            btn.disabled = true;
-
-            const prompt = `Explain this biology concept to a 5-year-old using simple analogies: "${originalText}". Keep it under 20 words.`;
-
-            try {
-                const res = await fetch(`${API_BASE}/api/ask`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: prompt, context: "Biology for Kids" })
-                });
-                const data = await res.json();
-                
-                // Show result in an alert or replace text (using alert for simplicity in this dense UI)
-                alert("✨ Simplified:\n\n" + data.reply);
-            } catch (err) {
-                alert("AI Brain Freeze!");
-            } finally {
-                btn.innerHTML = originalBtnText;
-                btn.disabled = false;
             }
         }
 

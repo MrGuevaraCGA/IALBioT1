@@ -1,79 +1,103 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// api/ask.js
 
-// SWITCH TO NODE.JS RUNTIME (Fixes the build error)
 export const config = {
-  maxDuration: 60, // Allow AI up to 60 seconds to think
+  maxDuration: 60, // seconds
 };
 
 const API_KEY = process.env.GEMINI_API_KEY;
 
-const ALLOWED_ORIGINS = [
-  "https://educadug.github.io",
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
-  // Add your Vercel URL here once you have it
-];
+export default async function handler(req, res) {
+  // --- CORS ---
+  const origin = req.headers.origin || "";
 
-export default async function handler(request, response) {
-  // --- CORS HANDLING ---
-  const origin = request.headers.origin;
-  
-  response.setHeader('Access-Control-Allow-Credentials', true);
-  response.setHeader('Access-Control-Allow-Origin', origin || '*');
-  response.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  response.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  // Handle Preflight Options
-  if (request.method === 'OPTIONS') {
-    return response.status(200).end();
+  if (
+    origin.includes("github.io") ||
+    origin.includes("vercel.app") ||
+    origin.startsWith("http://localhost")
+  ) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
 
-  if (request.method !== 'POST') {
-    return response.status(405).json({ error: 'Method Not Allowed' });
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-Requested-With, Accept"
+  );
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET,POST,OPTIONS"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  if (!API_KEY) {
+    return res
+      .status(500)
+      .json({ error: "Missing GEMINI_API_KEY environment variable" });
   }
 
   try {
-    if (!API_KEY) {
-      throw new Error("Missing GEMINI_API_KEY environment variable");
+    const { prompt, systemInstruction } = req.body || {};
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({ error: "Missing 'prompt' string in body" });
     }
 
-    const { prompt, context, mode } = request.body;
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    
-    // Configure model
-    const modelConfig = { model: "gemini-2.5-flash-preview-09-2025" };
-    
-    // Enforce JSON if requested (for Quiz)
-    if (mode === 'json') {
-      modelConfig.generationConfig = { responseMimeType: "application/json" };
+    const payload = {
+      contents: [
+        {
+          parts: [{ text: prompt }],
+        },
+      ],
+    };
+
+    if (systemInstruction && typeof systemInstruction === "string") {
+      payload.systemInstruction = {
+        parts: [{ text: systemInstruction }],
+      };
     }
 
-    const model = genAI.getModel(modelConfig);
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      }
+    );
 
-    const systemInstruction = `
-      You are an expert Biology Tutor for A-Level students.
-      Current Context: ${context || "General Biology"}
-      
-      Instructions:
-      1. Be concise (under 100 words unless asked for detail).
-      2. If mode is 'json', output ONLY valid JSON.
-      3. If the user asks for a 'Healthy Swap', explain the biochemical benefit (e.g., lowering LDL).
-      4. If the user asks for a 'Doctor's Report', use medical terminology (endothelium, atherosclerosis).
-    `;
+    if (!geminiRes.ok) {
+      const errorText = await geminiRes.text();
+      console.error("Gemini API error:", geminiRes.status, errorText);
+      return res.status(500).json({ error: "Gemini API error", details: errorText });
+    }
 
-    const fullPrompt = `${systemInstruction}\n\nUser Query: ${prompt}`;
-    
-    const result = await model.generateContent(fullPrompt);
-    const aiResponse = await result.response;
-    const text = aiResponse.text();
+    const result = await geminiRes.json();
 
-    return response.status(200).json({ reply: text });
+    const reply =
+      result.candidates &&
+      result.candidates[0] &&
+      result.candidates[0].content &&
+      Array.isArray(result.candidates[0].content.parts)
+        ? result.candidates[0].content.parts
+            .map((p) => p.text || "")
+            .join(" ")
+            .trim()
+        : "";
 
-  } catch (error) {
-    console.error("API Error:", error);
-    return response.status(500).json({ error: "Failed to process request", details: error.message });
+    return res.status(200).json({ reply: reply || "(No response text from model)" });
+  } catch (err) {
+    console.error("Server error:", err);
+    return res
+      .status(500)
+      .json({ error: "Failed to process request", details: err.message });
   }
 }

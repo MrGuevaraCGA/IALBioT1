@@ -1,64 +1,876 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-export const config = {
-  runtime: 'edge',
-};
-
-const API_KEY = process.env.GEMINI_API_KEY;
-
-const ALLOWED_ORIGINS = [
-  "https://educadug.github.io",
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
-  "https://ial-bio-t1.vercel.app/
-  // "https://your-vercel-project.vercel.app" // Uncomment and add your URL here
-];
-
-export default async function handler(request) {
-  const origin = request.headers.get('origin');
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  };
-
-  if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  try {
-    if (!API_KEY) throw new Error("Missing GEMINI_API_KEY");
-
-    const { prompt, context, mode } = await request.json();
-    const genAI = new GoogleGenerativeAI(API_KEY);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioMaster: Molecules & Heart</title>
     
-    // Configure model based on mode
-    const modelConfig = { model: "gemini-2.5-flash-preview-09-2025" };
-    if (mode === 'json') {
-      modelConfig.generationConfig = { responseMimeType: "application/json" };
-    }
+    <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-    const model = genAI.getModel(modelConfig);
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
 
-    const systemInstruction = `
-      You are an expert Biology Tutor for A-Level students.
-      Context: ${context || "General Biology"}
-      
-      ${mode === 'json' ? "Output strictly valid JSON." : "Output clear, concise text using Markdown for formatting."}
-    `;
+    <style>
+        :root {
+            --primary: #3B82F6; /* Bio Blue */
+            --secondary: #10B981; /* Life Green */
+            --accent: #F59E0B; /* Energy Gold */
+            --danger: #EF4444; /* Blood Red */
+            --dark: #1F2937;
+        }
 
-    const result = await model.generateContent(`${systemInstruction}\n\n${prompt}`);
-    const text = result.response.text();
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #F3F4F6;
+            overflow-x: hidden;
+        }
 
-    return new Response(JSON.stringify({ reply: text }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+        /* 3D Card Effect */
+        .card-3d {
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform-style: preserve-3d;
+        }
+        .card-3d:hover {
+            transform: translateY(-10px) rotateX(2deg) rotateY(2deg);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-}
+        /* Flip Card */
+        .flip-card {
+            background-color: transparent;
+            perspective: 1000px;
+            height: 320px; /* Increased slightly for new button */
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .flip-card:hover .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 1.5rem;
+        }
+        .flip-card-front {
+            background: white;
+            color: var(--dark);
+        }
+        .flip-card-back {
+            background: linear-gradient(135deg, var(--primary), #2563EB);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Floating Chat */
+        .chat-widget {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+        .chat-window {
+            display: none;
+            position: fixed;
+            bottom: 6rem;
+            right: 2rem;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            z-index: 50;
+            flex-direction: column;
+            overflow: hidden;
+            border: 2px solid var(--primary);
+        }
+        .chat-open {
+            display: flex;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid var(--primary);
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .sparkle-btn {
+            background: linear-gradient(45deg, #6366f1, #8b5cf6, #d946ef);
+            background-size: 200% 200%;
+            animation: gradient-shift 3s ease infinite;
+        }
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+    <script>
+        // --- CONFIGURATION ---
+        const API_BASE = "https://REPLACE_WITH_YOUR_VERCEL_URL.vercel.app"; 
+        
+        let currentContext = "General Biology";
+    </script>
+</head>
+<body class="text-gray-800">
+
+    <!-- Navigation -->
+    <nav class="bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b border-gray-200">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <a href="#" class="text-2xl font-black text-blue-600 flex items-center gap-2">
+                <i class="fas fa-dna"></i> BioMaster
+            </a>
+            <div class="hidden md:flex gap-6 font-medium text-gray-600">
+                <a href="#molecules" class="hover:text-blue-600 transition">Molecules</a>
+                <a href="#heart" class="hover:text-red-600 transition">Heart & Transport</a>
+                <a href="#cvd" class="hover:text-orange-600 transition">CVD & Risk</a>
+                <a href="#quiz" class="hover:text-green-600 transition">Quiz</a>
+            </div>
+            <button onclick="toggleChat()" class="bg-blue-600 text-white px-4 py-2 rounded-full font-bold shadow-lg hover:bg-blue-700 transition transform hover:scale-105">
+                AI Tutor
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="relative pt-20 pb-32 overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div class="container mx-auto px-4 text-center relative z-10" data-aos="fade-up">
+            <span class="bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-bold uppercase tracking-wide mb-4 inline-block">Topic 1</span>
+            <h1 class="text-5xl md:text-7xl font-black text-gray-900 mb-6 leading-tight">
+                Molecules, Transport<br><span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-teal-500">and Health</span>
+            </h1>
+            <p class="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
+                Master the biology of water, carbohydrates, lipids, and the cardiovascular system with interactive 3D learning.
+            </p>
+            <div class="flex justify-center gap-4">
+                <a href="#molecules" class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 transition transform hover:-translate-y-1">Start Learning</a>
+                <a href="#simulator" class="bg-white text-gray-800 px-8 py-4 rounded-xl font-bold text-lg shadow-xl hover:bg-gray-50 transition transform hover:-translate-y-1 border border-gray-200">
+                    <i class="fas fa-heartbeat text-red-500 mr-2"></i>Risk Simulator
+                </a>
+            </div>
+        </div>
+        
+        <!-- Decorative Shapes -->
+        <div class="absolute top-0 left-0 w-64 h-64 bg-blue-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
+        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+    </header>
+
+    <!-- SECTION 1: Water & Molecules -->
+    <section id="molecules" class="py-20">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl font-black text-center mb-12 text-gray-800" data-aos="fade-up">Biological Molecules</h2>
+            
+            <!-- Water Cards -->
+            <div class="mb-16">
+                <h3 class="text-2xl font-bold mb-6 text-blue-600 flex items-center gap-2">
+                    <i class="fas fa-tint"></i> Properties of Water
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Card 1 -->
+                    <div class="flip-card" data-aos="fade-up" data-aos-delay="0">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front">
+                                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-magnet text-3xl text-blue-600"></i>
+                                </div>
+                                <h4 class="text-xl font-bold">Polar Solvent</h4>
+                                <p class="text-gray-500 mt-2">Why does salt dissolve?</p>
+                            </div>
+                            <div class="flip-card-back">
+                                <h4 class="text-xl font-bold mb-2">Dipole Nature</h4>
+                                <p class="text-sm content-text">Water is polar (dipole). Slightly positive H atoms attract negative ions, and slightly negative O atoms attract positive ions.</p>
+                                <div class="flex gap-2 mt-4">
+                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
+                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 2 -->
+                    <div class="flip-card" data-aos="fade-up" data-aos-delay="100">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front">
+                                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-thermometer-half text-3xl text-red-600"></i>
+                                </div>
+                                <h4 class="text-xl font-bold">Thermal Buffer</h4>
+                                <p class="text-gray-500 mt-2">Why don't lakes boil?</p>
+                            </div>
+                            <div class="flip-card-back">
+                                <h4 class="text-xl font-bold mb-2">Specific Heat Capacity</h4>
+                                <p class="text-sm content-text">High SHC due to hydrogen bonds. It takes a lot of energy to raise water's temperature, creating stable habitats.</p>
+                                <div class="flex gap-2 mt-4">
+                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
+                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Card 3 -->
+                    <div class="flip-card" data-aos="fade-up" data-aos-delay="200">
+                        <div class="flip-card-inner">
+                            <div class="flip-card-front">
+                                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                    <i class="fas fa-leaf text-3xl text-green-600"></i>
+                                </div>
+                                <h4 class="text-xl font-bold">Transport</h4>
+                                <p class="text-gray-500 mt-2">Cohesion & Adhesion</p>
+                            </div>
+                            <div class="flip-card-back">
+                                <h4 class="text-xl font-bold mb-2">Sticky Water</h4>
+                                <p class="text-sm content-text">Cohesion (water sticks to water) and Adhesion (water sticks to xylem) allow transport up tall trees.</p>
+                                <div class="flex gap-2 mt-4">
+                                    <button onclick="readAloud(this)" class="bg-white/20 p-2 rounded-full hover:bg-white/40"><i class="fas fa-volume-up"></i></button>
+                                    <button onclick="explainSimple(this)" class="bg-white/20 px-3 py-1 rounded-full text-xs font-bold hover:bg-white/40 flex items-center gap-1">✨ Simplify</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carbohydrates Accordion -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start" data-aos="fade-right">
+                <div class="bg-white p-8 rounded-3xl shadow-xl">
+                    <h3 class="text-2xl font-bold mb-6 text-yellow-600"><i class="fas fa-bread-slice"></i> Carbohydrates</h3>
+                    <div class="space-y-4">
+                        <details class="group bg-gray-50 p-4 rounded-xl cursor-pointer">
+                            <summary class="font-bold flex justify-between items-center list-none">
+                                <span>Monosaccharides</span>
+                                <span class="transition group-open:rotate-180"><i class="fas fa-chevron-down"></i></span>
+                            </summary>
+                            <div class="text-gray-600 mt-3 text-sm leading-relaxed">
+                                Single sugar units like <strong>Glucose, Fructose, and Galactose</strong>. They are rapid energy sources. Glucose comes in alpha and beta forms (isomers).
+                            </div>
+                        </details>
+                        <details class="group bg-gray-50 p-4 rounded-xl cursor-pointer">
+                            <summary class="font-bold flex justify-between items-center list-none">
+                                <span>Disaccharides</span>
+                                <span class="transition group-open:rotate-180"><i class="fas fa-chevron-down"></i></span>
+                            </summary>
+                            <div class="text-gray-600 mt-3 text-sm leading-relaxed">
+                                Formed by condensation reactions creating <strong>Glycosidic Bonds</strong>.
+                                <ul class="list-disc ml-4 mt-2">
+                                    <li>Maltose = Glucose + Glucose</li>
+                                    <li>Sucrose = Glucose + Fructose</li>
+                                    <li>Lactose = Glucose + Galactose</li>
+                                </ul>
+                            </div>
+                        </details>
+                        <details class="group bg-gray-50 p-4 rounded-xl cursor-pointer">
+                            <summary class="font-bold flex justify-between items-center list-none">
+                                <span>Polysaccharides (Storage)</span>
+                                <span class="transition group-open:rotate-180"><i class="fas fa-chevron-down"></i></span>
+                            </summary>
+                            <div class="text-gray-600 mt-3 text-sm leading-relaxed">
+                                <strong>Starch (Plants):</strong> Amylose (coiled) + Amylopectin (branched). Compact and insoluble.<br>
+                                <strong>Glycogen (Animals):</strong> Highly branched for rapid hydrolysis into glucose for muscles.
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                
+                <!-- Lipids Visual -->
+                <div class="bg-white p-8 rounded-3xl shadow-xl" data-aos="fade-left">
+                    <h3 class="text-2xl font-bold mb-6 text-yellow-600"><i class="fas fa-oil-can"></i> Lipids: The Difference</h3>
+                    <div class="space-y-6">
+                        <div class="bg-red-50 p-4 rounded-xl border-l-4 border-red-400">
+                            <h4 class="font-bold text-red-800">Saturated Fats (Butter)</h4>
+                            <p class="text-sm text-red-600 mb-2">Straight chains, pack tightly, solid at room temp.</p>
+                            <div class="h-2 bg-gray-300 rounded-full w-full overflow-hidden">
+                                <div class="h-full bg-red-400 w-full"></div>
+                            </div>
+                            <p class="text-xs text-center mt-1">C-C Single Bonds Only</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-xl border-l-4 border-green-400">
+                            <h4 class="font-bold text-green-800">Unsaturated Fats (Oil)</h4>
+                            <p class="text-sm text-green-600 mb-2">Kinked chains due to double bonds, liquid at room temp.</p>
+                            <div class="flex items-center gap-1 w-full justify-center opacity-50">
+                                <div class="h-2 w-10 bg-green-400 rounded-full transform rotate-0"></div>
+                                <div class="h-2 w-10 bg-green-400 rounded-full transform rotate-12"></div>
+                                <div class="h-2 w-10 bg-green-400 rounded-full transform -rotate-12"></div>
+                            </div>
+                            <p class="text-xs text-center mt-1">C=C Double Bonds (Kinks)</p>
+                        </div>
+                        <button onclick="askAI('Explain the difference between triglycerides and phospholipids')" class="w-full py-2 bg-yellow-100 text-yellow-700 rounded-lg font-bold hover:bg-yellow-200 transition">
+                            <i class="fas fa-search"></i> Ask AI: Triglycerides vs Phospholipids?
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 2: Heart & Simulator -->
+    <section id="heart" class="bg-white py-20 relative overflow-hidden">
+        <div class="container mx-auto px-4 relative z-10">
+            <h2 class="text-4xl font-black text-center mb-12 text-gray-800" data-aos="fade-up">The Engine of Life</h2>
+
+            <!-- Heart Interactive Diagram -->
+            <div class="flex flex-col lg:flex-row gap-12 items-center mb-20">
+                <div class="lg:w-1/2" data-aos="fade-right">
+                    <!-- Simple SVG Representation of Heart flow -->
+                    <svg viewBox="0 0 400 400" class="w-full h-auto drop-shadow-2xl">
+                        <circle cx="200" cy="200" r="180" fill="#fee2e2" />
+                        <!-- Right Side (Deoxygenated) -->
+                        <path d="M 200 40 Q 360 40 360 200 Q 360 360 200 360 Z" fill="#93c5fd" opacity="0.8" />
+                        <text x="260" y="200" font-family="sans-serif" font-size="20" fill="#1e3a8a" font-weight="bold">Right Side</text>
+                        <text x="260" y="225" font-family="sans-serif" font-size="14" fill="#1e3a8a">Deoxygenated</text>
+                        <!-- Left Side (Oxygenated) -->
+                        <path d="M 200 40 Q 40 40 40 200 Q 40 360 200 360 Z" fill="#fca5a5" opacity="0.8" />
+                        <text x="100" y="200" font-family="sans-serif" font-size="20" fill="#7f1d1d" font-weight="bold">Left Side</text>
+                        <text x="100" y="225" font-family="sans-serif" font-size="14" fill="#7f1d1d">Oxygenated</text>
+                        <!-- Divider -->
+                        <line x1="200" y1="40" x2="200" y2="360" stroke="#fff" stroke-width="4" stroke-dasharray="10,5"/>
+                        <text x="175" y="380" font-size="12" fill="#555">Septum</text>
+                    </svg>
+                </div>
+                <div class="lg:w-1/2 space-y-6" data-aos="fade-left">
+                    <div class="bg-gray-50 p-6 rounded-2xl border-l-8 border-blue-500 hover:bg-white transition shadow-md cursor-pointer" onclick="toggleInfo('veins')">
+                        <h4 class="text-xl font-bold text-gray-800">1. Veins (In)</h4>
+                        <p id="veins-info" class="text-gray-600 mt-2 hidden">Vena Cava brings deoxygenated blood to Right Atrium. Pulmonary Vein brings oxygenated blood to Left Atrium. Low pressure, valves prevent backflow.</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-2xl border-l-8 border-purple-500 hover:bg-white transition shadow-md cursor-pointer" onclick="toggleInfo('atria')">
+                        <h4 class="text-xl font-bold text-gray-800">2. Atrial Systole</h4>
+                        <p id="atria-info" class="text-gray-600 mt-2 hidden">Atria contract. Blood pushed through AV valves (Tricuspid/Bicuspid) into Ventricles.</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-2xl border-l-8 border-red-500 hover:bg-white transition shadow-md cursor-pointer" onclick="toggleInfo('ventricles')">
+                        <h4 class="text-xl font-bold text-gray-800">3. Ventricular Systole</h4>
+                        <p id="ventricles-info" class="text-gray-600 mt-2 hidden">Ventricles contract strongly. AV valves shut ("LUB"). Blood forced up through Semilunar valves into Arteries.</p>
+                    </div>
+                    <div class="bg-gray-50 p-6 rounded-2xl border-l-8 border-orange-500 hover:bg-white transition shadow-md cursor-pointer" onclick="toggleInfo('arteries')">
+                        <h4 class="text-xl font-bold text-gray-800">4. Arteries (Out)</h4>
+                        <p id="arteries-info" class="text-gray-600 mt-2 hidden">Pulmonary Artery to lungs. Aorta to body. Thick muscular walls for high pressure. Elastic recoil maintains flow.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SIMULATOR -->
+            <div id="simulator" class="max-w-4xl mx-auto bg-gray-900 text-white rounded-3xl p-8 shadow-2xl" data-aos="zoom-in">
+                <div class="text-center mb-8">
+                    <span class="bg-red-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest">Interactive Simulation</span>
+                    <h3 class="text-3xl font-bold mt-4">CVD Risk Predictor</h3>
+                    <p class="text-gray-400">Adjust the lifestyle variables to see how they impact cardiovascular health.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Controls -->
+                    <div class="space-y-6">
+                        <div>
+                            <label class="flex justify-between font-bold mb-2">Smoking Habits <span id="val-smoke" class="text-red-400">Non-Smoker</span></label>
+                            <input type="range" min="0" max="2" step="1" value="0" id="input-smoke" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-500" oninput="updateSimulator()">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1"><span>None</span><span>Heavy</span></div>
+                        </div>
+                        <div>
+                            <label class="flex justify-between font-bold mb-2">Diet (Saturated Fats) <span id="val-diet" class="text-yellow-400">Healthy</span></label>
+                            <input type="range" min="0" max="2" step="1" value="0" id="input-diet" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500" oninput="updateSimulator()">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1"><span>Healthy</span><span>Poor</span></div>
+                        </div>
+                        <div>
+                            <label class="flex justify-between font-bold mb-2">Exercise Level <span id="val-ex" class="text-green-400">Active</span></label>
+                            <input type="range" min="0" max="2" step="1" value="2" id="input-ex" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500" oninput="updateSimulator()">
+                            <div class="flex justify-between text-xs text-gray-500 mt-1"><span>Sedentary</span><span>Active</span></div>
+                        </div>
+                        
+                        <!-- AI Feature Button -->
+                        <button onclick="analyzeRisk()" class="w-full py-3 sparkle-btn text-white rounded-xl font-bold shadow-lg transform transition hover:-translate-y-1 flex justify-center items-center gap-2">
+                            <i class="fas fa-user-md"></i> Generate Doctor's Report ✨
+                        </button>
+                    </div>
+
+                    <!-- Output -->
+                    <div class="bg-gray-800 rounded-2xl p-6 flex flex-col justify-center items-center text-center relative overflow-hidden">
+                        <div id="ai-report-area" class="hidden absolute inset-0 bg-gray-800 z-20 p-6 overflow-y-auto text-left">
+                            <h4 class="text-yellow-400 font-bold mb-2"><i class="fas fa-notes-medical"></i> Medical Prognosis</h4>
+                            <div id="ai-report-text" class="text-sm text-gray-300 leading-relaxed"></div>
+                            <button onclick="closeReport()" class="mt-4 text-xs text-gray-500 hover:text-white underline">Close Report</button>
+                        </div>
+
+                        <h4 class="text-gray-400 uppercase text-sm font-bold mb-4">Estimated 10-Year Risk</h4>
+                        <div id="risk-circle" class="w-32 h-32 rounded-full border-8 border-green-500 flex items-center justify-center text-3xl font-black mb-4 transition-all duration-500">
+                            <span id="risk-score">Low</span>
+                        </div>
+                        <p id="risk-feedback" class="text-sm text-green-300">Great job! Keep up the healthy lifestyle.</p>
+                        
+                        <!-- Dynamic Artery Visual -->
+                        <div class="w-full h-4 bg-red-900 rounded-full mt-6 relative overflow-hidden">
+                            <div class="absolute top-0 left-0 h-full w-full bg-red-600 animate-pulse"></div>
+                            <!-- Plaque -->
+                            <div id="plaque-visual" class="absolute top-0 right-0 h-full bg-yellow-200 transition-all duration-500 w-0"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Artery Occlusion</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 3: CVD & Healthy Swap -->
+    <section id="cvd" class="py-20 bg-orange-50">
+        <div class="container mx-auto px-4">
+            <h2 class="text-4xl font-black text-center mb-12 text-gray-800" data-aos="fade-up">CVD & Lifestyle</h2>
+            
+            <div class="max-w-4xl mx-auto bg-white rounded-3xl shadow-xl p-8 mb-12 border-2 border-orange-100">
+                <div class="flex flex-col md:flex-row gap-8 items-center">
+                    <div class="md:w-1/2">
+                        <h3 class="text-2xl font-bold text-orange-600 mb-4"><i class="fas fa-carrot"></i> The Healthy Swap Engine ✨</h3>
+                        <p class="text-gray-600 mb-6">Craving something unhealthy? Ask the AI for a bio-chemically superior alternative that lowers LDL cholesterol.</p>
+                        <div class="relative">
+                            <input type="text" id="food-input" placeholder="e.g., Fried Chicken, Donuts..." class="w-full pl-4 pr-12 py-3 rounded-xl border-2 border-orange-200 focus:border-orange-500 focus:outline-none">
+                            <button onclick="getHealthySwap()" class="absolute right-2 top-2 bg-orange-500 text-white p-2 rounded-lg hover:bg-orange-600 transition">
+                                <i class="fas fa-magic"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="md:w-1/2 bg-orange-50 p-6 rounded-2xl w-full min-h-[150px] flex items-center justify-center">
+                        <div id="swap-result" class="text-center text-orange-800">
+                            <p class="italic opacity-60">"Enter a food to see the magic..."</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECTION 4: AI Quiz -->
+    <section id="quiz" class="py-20 bg-blue-50">
+        <div class="container mx-auto px-4 max-w-3xl">
+            <h2 class="text-4xl font-black text-center mb-8 text-gray-800">Mastery Check</h2>
+            <div class="bg-white rounded-3xl shadow-lg p-8 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4">
+                    <button onclick="generateQuiz()" class="text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-bold hover:bg-purple-200 transition flex items-center gap-1">
+                        <i class="fas fa-plus"></i> Generate New Question ✨
+                    </button>
+                </div>
+
+                <div id="quiz-container">
+                    <div class="mb-6 flex justify-between items-center">
+                        <span class="text-gray-500 font-bold">Question <span id="q-num">1</span></span>
+                        <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-bold">Multiple Choice</span>
+                    </div>
+                    
+                    <div id="quiz-loader" class="hidden text-center py-8">
+                        <div class="loader mb-4"></div>
+                        <p class="text-gray-500">Consulting the AI Biology Professor...</p>
+                    </div>
+
+                    <div id="quiz-content">
+                        <h3 id="q-text" class="text-xl font-bold mb-6 text-gray-800">Which bond holds water molecules together?</h3>
+                        <div id="q-options" class="space-y-3">
+                            <!-- Options generated by JS -->
+                        </div>
+                    </div>
+                    
+                    <button id="next-btn" onclick="nextQuestion()" class="mt-6 w-full bg-blue-600 text-white py-3 rounded-xl font-bold hidden hover:bg-blue-700 transition">Next Question</button>
+                </div>
+                <div id="quiz-result" class="hidden text-center py-10">
+                    <i class="fas fa-trophy text-6xl text-yellow-400 mb-4 animate-bounce"></i>
+                    <h3 class="text-3xl font-black text-gray-800 mb-2">Quiz Complete!</h3>
+                    <p class="text-xl text-gray-600 mb-6">You scored <span id="final-score" class="font-bold text-blue-600"></span></p>
+                    <button onclick="resetQuiz()" class="bg-gray-800 text-white px-8 py-3 rounded-xl font-bold hover:bg-black transition">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Chat Widget -->
+    <div class="chat-widget">
+        <button onclick="toggleChat()" class="w-16 h-16 bg-blue-600 rounded-full shadow-2xl flex items-center justify-center text-white text-2xl hover:scale-110 transition transform">
+            <i class="fas fa-robot"></i>
+        </button>
+    </div>
+
+    <div id="chat-window" class="chat-window">
+        <div class="bg-blue-600 p-4 text-white font-bold flex justify-between items-center">
+            <span><i class="fas fa-brain mr-2"></i>BioBot</span>
+            <button onclick="toggleChat()" class="hover:text-gray-200"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="chat-messages" class="flex-1 p-4 overflow-y-auto bg-gray-50 space-y-4 text-sm">
+            <div class="bg-white p-3 rounded-lg rounded-tl-none shadow-sm max-w-[85%]">
+                Hello! I'm your Biology AI Tutor. Ask me about arteries, starch, or CVD risk!
+            </div>
+        </div>
+        <div class="p-3 bg-white border-t border-gray-200 flex gap-2">
+            <input type="text" id="chat-input" placeholder="Ask a question..." class="flex-1 bg-gray-100 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" onkeypress="handleEnter(event)">
+            <button onclick="sendMessage()" class="w-10 h-10 bg-blue-600 rounded-full text-white flex items-center justify-center hover:bg-blue-700 transition">
+                <i class="fas fa-paper-plane"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        AOS.init();
+
+        // --- Simulator Logic ---
+        function updateSimulator() {
+            const smoke = parseInt(document.getElementById('input-smoke').value);
+            const diet = parseInt(document.getElementById('input-diet').value);
+            const ex = parseInt(document.getElementById('input-ex').value);
+
+            // Update Labels
+            const smokeLabels = ["Non-Smoker", "Occasional", "Heavy"];
+            const dietLabels = ["Healthy", "Moderate", "High Saturated Fat"];
+            const exLabels = ["Sedentary", "Moderate", "Active"];
+
+            document.getElementById('val-smoke').innerText = smokeLabels[smoke];
+            document.getElementById('val-diet').innerText = dietLabels[diet];
+            document.getElementById('val-ex').innerText = exLabels[ex];
+
+            // Calculate "Risk" Score
+            const exRisk = 2 - ex; 
+            let totalRisk = smoke + diet + exRisk; 
+            
+            // Map 0-6 to UI
+            const riskCircle = document.getElementById('risk-circle');
+            const plaque = document.getElementById('plaque-visual');
+            const feedback = document.getElementById('risk-feedback');
+            const scoreText = document.getElementById('risk-score');
+
+            if (totalRisk <= 1) {
+                riskCircle.style.borderColor = "#10B981"; // Green
+                riskCircle.style.color = "#10B981";
+                scoreText.innerText = "Low";
+                plaque.style.width = "5%";
+                feedback.innerText = "Excellent! Your arteries are clear.";
+            } else if (totalRisk <= 3) {
+                riskCircle.style.borderColor = "#F59E0B"; // Orange
+                riskCircle.style.color = "#F59E0B";
+                scoreText.innerText = "Med";
+                plaque.style.width = "40%";
+                feedback.innerText = "Warning. Consider reducing fats or increasing cardio.";
+            } else {
+                riskCircle.style.borderColor = "#EF4444"; // Red
+                riskCircle.style.color = "#EF4444";
+                scoreText.innerText = "High";
+                plaque.style.width = "80%";
+                feedback.innerText = "High Risk! Atherosclerosis likely. High chance of clotting.";
+            }
+        }
+
+        async function analyzeRisk() {
+            const smoke = document.getElementById('val-smoke').innerText;
+            const diet = document.getElementById('val-diet').innerText;
+            const ex = document.getElementById('val-ex').innerText;
+            const reportArea = document.getElementById('ai-report-area');
+            const reportText = document.getElementById('ai-report-text');
+
+            reportArea.classList.remove('hidden');
+            reportText.innerHTML = '<div class="loader"></div> Analyzing patient vitals...';
+
+            const prompt = `Acting as a cardiologist, analyze a patient profile: Smoking [${smoke}], Diet [${diet}], Activity [${ex}]. Predict specific physiological changes in arteries (endothelium, plaque) over 10 years. Mention 'Atherosclerosis' if risk is high. Keep it under 60 words.`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, context: "Cardiology" })
+                });
+                const data = await res.json();
+                reportText.innerHTML = marked.parse(data.reply);
+            } catch (err) {
+                reportText.innerText = "Error contacting medical database.";
+            }
+        }
+
+        function closeReport() {
+            document.getElementById('ai-report-area').classList.add('hidden');
+        }
+
+        // --- Healthy Swap Logic ---
+        async function getHealthySwap() {
+            const food = document.getElementById('food-input').value;
+            if(!food) return;
+            
+            const resultDiv = document.getElementById('swap-result');
+            resultDiv.innerHTML = '<div class="loader"></div><p class="text-sm mt-2">Finding healthy alternative...</p>';
+
+            const prompt = `Suggest a bio-chemically healthier alternative to "${food}". Explain the benefit in terms of lipids/LDL/HDL or blood pressure. Keep it under 40 words.`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, context: "Nutrition" })
+                });
+                const data = await res.json();
+                resultDiv.innerHTML = marked.parse(data.reply);
+            } catch (err) {
+                resultDiv.innerText = "AI is offline.";
+            }
+        }
+
+        // --- Explain Simple Logic (New) ---
+        async function explainSimple(btn) {
+            // Find the sibling text (the detailed description)
+            const cardBack = btn.closest('.flip-card-back');
+            const originalText = cardBack.querySelector('.content-text').innerText;
+            
+            // Temporary loading state
+            const originalBtnText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            const prompt = `Explain this biology concept to a 5-year-old using simple analogies: "${originalText}". Keep it under 20 words.`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, context: "Biology for Kids" })
+                });
+                const data = await res.json();
+                
+                // Show result in an alert or replace text (using alert for simplicity in this dense UI)
+                alert("✨ Simplified:\n\n" + data.reply);
+            } catch (err) {
+                alert("AI Brain Freeze!");
+            } finally {
+                btn.innerHTML = originalBtnText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- Info Toggles ---
+        function toggleInfo(id) {
+            const el = document.getElementById(id + '-info');
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                el.classList.add('block', 'animate-fade-in');
+            } else {
+                el.classList.add('hidden');
+            }
+        }
+
+        // --- Quiz Logic ---
+        const staticQuestions = [
+            { q: "Which property allows water to travel up plant stems?", options: ["High Specific Heat", "Cohesion & Adhesion", "Solvent Ability", "Density"], a: 1 },
+            { q: "What is the monomer of Glycogen?", options: ["Beta-Glucose", "Alpha-Glucose", "Fructose", "Amino Acid"], a: 1 },
+            { q: "Which bonds join fatty acids to glycerol?", options: ["Glycosidic", "Peptide", "Ester", "Hydrogen"], a: 2 }
+        ];
+        
+        let questions = [...staticQuestions];
+        let currentQ = 0;
+        let score = 0;
+
+        function loadQuestion() {
+            document.getElementById('quiz-loader').classList.add('hidden');
+            document.getElementById('quiz-content').classList.remove('hidden');
+            
+            const q = questions[currentQ];
+            document.getElementById('q-num').innerText = currentQ + 1;
+            document.getElementById('q-text').innerText = q.q;
+            const optsDiv = document.getElementById('q-options');
+            optsDiv.innerHTML = '';
+            
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 rounded-xl border-2 border-gray-100 hover:border-blue-500 hover:bg-blue-50 transition font-medium";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(index, btn);
+                optsDiv.appendChild(btn);
+            });
+            document.getElementById('next-btn').classList.add('hidden');
+        }
+
+        async function generateQuiz() {
+            document.getElementById('quiz-content').classList.add('hidden');
+            document.getElementById('quiz-loader').classList.remove('hidden');
+            document.getElementById('next-btn').classList.add('hidden');
+
+            const prompt = `Generate 1 multiple choice question about A-Level Biology topic: Molecules, Heart, or CVD. Return strictly valid JSON with this format: { "q": "Question text", "options": ["A", "B", "C", "D"], "a": 0 } (where 'a' is the index 0-3 of the correct answer). Do not use markdown blocks.`;
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt, context: "Biology Exam", mode: "json" })
+                });
+                const data = await res.json();
+                
+                // Parse JSON from text (remove markdown if present)
+                let cleanJson = data.reply.replace(/```json/g, '').replace(/```/g, '').trim();
+                const newQ = JSON.parse(cleanJson);
+                
+                questions.push(newQ);
+                currentQ = questions.length - 1; // Jump to new question
+                loadQuestion();
+                
+            } catch (err) {
+                console.error(err);
+                alert("Failed to generate question. Try again!");
+                loadQuestion(); // Revert
+            }
+        }
+
+        function checkAnswer(selected, btn) {
+            const correct = questions[currentQ].a;
+            const parent = document.getElementById('q-options');
+            const buttons = parent.getElementsByTagName('button');
+            
+            for(let b of buttons) { b.disabled = true; } // Disable all
+
+            if(selected === correct) {
+                btn.classList.add('bg-green-100', 'border-green-500', 'text-green-700');
+                score++;
+            } else {
+                btn.classList.add('bg-red-100', 'border-red-500', 'text-red-700');
+                buttons[correct].classList.add('bg-green-100', 'border-green-500', 'text-green-700');
+            }
+            document.getElementById('next-btn').classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentQ++;
+            if (currentQ < questions.length) {
+                loadQuestion();
+            } else {
+                document.getElementById('quiz-container').classList.add('hidden');
+                document.getElementById('quiz-result').classList.remove('hidden');
+                document.getElementById('final-score').innerText = score + "/" + questions.length;
+            }
+        }
+
+        function resetQuiz() {
+            currentQ = 0;
+            score = 0;
+            questions = [...staticQuestions]; // Reset to defaults
+            document.getElementById('quiz-result').classList.add('hidden');
+            document.getElementById('quiz-container').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        // --- Chat Logic ---
+        function toggleChat() {
+            const chat = document.getElementById('chat-window');
+            chat.classList.toggle('chat-open');
+            if(chat.classList.contains('chat-open')) {
+                chat.style.display = 'flex';
+            } else {
+                setTimeout(() => chat.style.display = 'none', 300);
+            }
+        }
+
+        function askAI(prompt) {
+            if (!document.getElementById('chat-window').classList.contains('chat-open')) {
+                toggleChat();
+            }
+            document.getElementById('chat-input').value = prompt;
+            sendMessage();
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msg = input.value.trim();
+            if (!msg) return;
+
+            // Add User Message
+            addMessage(msg, 'user');
+            input.value = '';
+
+            // Loading state
+            const loadingId = addMessage('<div class="loader"></div>', 'bot');
+
+            try {
+                const res = await fetch(`${API_BASE}/api/ask`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: msg, context: currentContext })
+                });
+                
+                const data = await res.json();
+                
+                // Remove loader and add response
+                document.getElementById(loadingId).remove();
+                
+                if (data.error) {
+                    addMessage("⚠️ Brain freeze! Please check your API Key configuration.", 'bot');
+                } else {
+                    // Render Markdown
+                    const html = marked.parse(data.reply);
+                    addMessage(html, 'bot');
+                }
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                addMessage("⚠️ Connection error. Is the backend deployed?", 'bot');
+            }
+        }
+
+        function addMessage(content, sender) {
+            const div = document.createElement('div');
+            const id = 'msg-' + Date.now();
+            div.id = id;
+            div.className = sender === 'user' 
+                ? "bg-blue-600 text-white p-3 rounded-lg rounded-tr-none self-end max-w-[85%] ml-auto"
+                : "bg-white p-3 rounded-lg rounded-tl-none shadow-sm max-w-[85%] text-gray-800";
+            div.innerHTML = content;
+            document.getElementById('chat-messages').appendChild(div);
+            document.getElementById('chat-messages').scrollTop = document.getElementById('chat-messages').scrollHeight;
+            return id;
+        }
+
+        function readAloud(btn) {
+            const text = btn.parentElement.querySelector('p').innerText;
+            const speech = new SpeechSynthesisUtterance(text);
+            window.speechSynthesis.speak(speech);
+        }
+
+        // Initialize
+        loadQuestion();
+    </script>
+</body>
+</html>
